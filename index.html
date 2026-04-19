@@ -1,1 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Jardin de mi amor por ti</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #e0f7fa;
+            font-family: 'Courier New', Courier, monospace; /* Cute font */
+        }
+        canvas { display: block; }
+        
+        /* The Start Screen */
+        #ui {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #5d5d5d;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: opacity 0.5s;
+            z-index: 10;
+        }
+        button {
+            background: #FFB7B2;
+            border: none;
+            padding: 10px 20px;
+            color: white;
+            font-size: 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover { background: #ff9e99; }
+        
+        body.playing #ui {
+            opacity: 0;
+            pointer-events: none;
+        }
 
+        /* --- THE MESSAGE BUBBLES --- */
+        .message {
+            position: absolute;
+            background: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 14px;
+            color: #666;
+            pointer-events: none; /* Let clicks pass through */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            /* Animation: Fade out and move up */
+            animation: floatUp 2.5s ease-out forwards;
+            white-space: nowrap;
+            z-index: 5;
+        }
+
+        /* Define the floating animation */
+        @keyframes floatUp {
+            0% { opacity: 0; transform: translate(-50%, 0); }
+            15% { opacity: 1; transform: translate(-50%, -10px); }
+            100% { opacity: 0; transform: translate(-50%, -50px); }
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <h1>Jardin de mi amor por ti</h1>
+    <p>Click para plantar</p>
+    <button id="startBtn">Entrar al jardin</button>
+</div>
+
+<div id="messageContainer"></div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // --- 1. SETUP & RESIZE ---
+    let width, height;
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // --- 2. ASSETS ---
+    function createFlowerSprite(color) {
+        const c = document.createElement('canvas');
+        c.width = 32; c.height = 32;
+        const x = c.getContext('2d');
+        x.fillStyle = "#8FA998"; 
+        x.fillRect(14, 16, 4, 16);
+        x.fillStyle = color; 
+        x.beginPath(); x.arc(16, 16, 10, 0, Math.PI*2); x.fill();
+        x.fillStyle = "white"; 
+        x.beginPath(); x.arc(16, 16, 4, 0, Math.PI*2); x.fill();
+        const img = new Image();
+        img.src = c.toDataURL();
+        return img;
+    }
+    const flowerColors = ['#FFB7B2', '#FFDAC1', '#B5EAD7', '#C7CEEA', '#F6EAC2'];
+    const flowerSprites = flowerColors.map(color => createFlowerSprite(color));
+
+    // --- 3. AUDIO ---
+    let audioCtx;
+    function initAudio() {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+        const droneOsc = audioCtx.createOscillator();
+        const droneGain = audioCtx.createGain();
+        droneOsc.type = 'sine';
+        droneOsc.frequency.value = 110; 
+        droneGain.gain.value = 0.05; 
+        droneOsc.connect(droneGain);
+        droneGain.connect(audioCtx.destination);
+        droneOsc.start();
+    }
+    function playChime() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25];
+        osc.frequency.value = notes[Math.floor(Math.random() * notes.length)];
+        osc.type = 'triangle'; 
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 1.5);
+    }
+
+    // --- 4. MESSAGE SYSTEM (New!) ---
+    const messages = [
+        "TE AMO MUCHO.",
+        "ERES MI DUEÑA.",
+        "ERES ADMIRABLE.",
+        "ERES DEMASIADO HERMOSA",
+        "ERES LINDISIMAAA.",
+        "tonta.",
+        "rata.",
+        "ERES MUY INTELIGENTE.",
+        "ME ENCANTAN TUS OJOS CAFECITOSSS.",
+        "ME ENCANTA COMO TE RIES.",
+        "ME ENAMORA TU VOZZ.",
+        "MI ESPOSA.",
+        "SIEMPRE TE AMARE A MASHHH",
+        "MI REINA",
+        "TE AMO MUCHO MUCHO MUCHO MUCHO",
+        "QUIERO UNA VIDA JUNTOS TU Y YOOO",
+        "DARIA MI VIDA POL TII AMORRR",
+        "MI PRINCESITA",
+        "TE AMO MASHHH",
+        "ME GUSTA TU CABELLITO"
+        "MI NIÑA",
+        "ERES LA MEJORR",
+        "ERES LA MEJOR NOVIA",
+        "MI WAWITA",
+        "infiel",
+        "MUAKKKKKKKK",
+        "💙💙💙💙💙💙"
+    ];
+
+    function spawnMessage(x, y) {
+        // Pick a random text
+        const text = messages[Math.floor(Math.random() * messages.length)];
+        
+        // Create HTML element
+        const el = document.createElement('div');
+        el.className = 'message';
+        el.innerText = text;
+        
+        // Position it (offset slightly up so it doesn't cover the flower)
+        el.style.left = x + 'px';
+        el.style.top = (y - 40) + 'px';
+        
+        // Add to screen
+        document.body.appendChild(el);
+
+        // Remove from HTML after 2.5 seconds (to keep memory clean)
+        setTimeout(() => {
+            el.remove();
+        }, 2500);
+    }
+
+    // --- 5. GAME LOGIC ---
+    class Particle {
+        constructor(x, y) {
+            this.x = x; this.y = y;
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = (Math.random() - 0.5) * 2;
+            this.life = 1.0;
+        }
+        update() { this.x += this.vx; this.y += this.vy; this.life -= 0.02; }
+        draw(ctx) {
+            ctx.globalAlpha = this.life;
+            ctx.fillStyle = "white";
+            ctx.beginPath(); ctx.arc(this.x, this.y, 2, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = 1.0;
+        }
+    }
+
+    class Plant {
+        constructor(x, y) {
+            this.x = x; this.y = y + 50; this.finalY = y;
+            this.sprite = flowerSprites[Math.floor(Math.random() * flowerSprites.length)];
+            this.scale = 0;
+        }
+        update() {
+            this.y += (this.finalY - this.y) * 0.1;
+            if (this.scale < 1) this.scale += 0.05;
+        }
+        draw(ctx) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.scale(this.scale, this.scale);
+            ctx.drawImage(this.sprite, -16, -32, 32, 32);
+            ctx.restore();
+        }
+    }
+
+    const plants = [];
+    let particles = [];
+    let isPlaying = false;
+
+    function animate() {
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, "#E0C3FC");
+        gradient.addColorStop(1, "#8EC5FC");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.fillStyle = "#F0F4C3";
+        ctx.fillRect(0, height - 40, width, 40);
+
+        plants.sort((a, b) => a.finalY - b.finalY);
+        plants.forEach(p => { p.update(); p.draw(ctx); });
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update();
+            particles[i].draw(ctx);
+            if (particles[i].life <= 0) particles.splice(i, 1);
+        }
+        requestAnimationFrame(animate);
+    }
+
+    // --- INPUT ---
+    document.getElementById('startBtn').addEventListener('click', () => {
+        document.body.classList.add('playing');
+        isPlaying = true;
+        initAudio();
+    });
+
+    window.addEventListener('click', (e) => {
+        if (!isPlaying) return;
+
+        // 1. Plant
+        plants.push(new Plant(e.clientX, e.clientY));
+        
+        // 2. Particles
+        for(let i=0; i<8; i++) {
+            particles.push(new Particle(e.clientX, e.clientY - 20));
+        }
+
+        // 3. Audio
+        playChime();
+
+        // 4. Message (NEW!)
+        spawnMessage(e.clientX, e.clientY);
+    });
+
+    animate();
+</script>
+</body>
+</html>
